@@ -1,0 +1,48 @@
+{
+  "name": "@dainami/kie-mcp",
+  "version": "0.1.0",
+  "description": "Minimal MCP server for calling any KIE.ai endpoint. Pure HTTP shim — no model registry, agent constructs payloads from docs.kie.ai.",
+  "type": "module",
+  "bin": {
+    "dainami-kie-mcp": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "author": "Dainami",
+  "homepage": "https://github.com/dainami/kie-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dainami/kie-mcp"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "kie",
+    "kie.ai",
+    "claude",
+    "ai",
+    "image-generation",
+    "video-generation"
+  ]
+}
