@@ -1,7 +1,7 @@
 {
   "name": "@dainami/kie-mcp",
-  "version": "0.1.0",
-  "description": "Minimal MCP server for calling any KIE.ai endpoint. Pure HTTP shim — no model registry, agent constructs payloads from docs.kie.ai.",
+  "version": "0.1.1",
+  "description": "Generate images, videos, and music with the latest AI models — Seedance, Kling, GPT Image 2, Nano Banana, Suno V4 — via KIE.ai from any MCP client. Auto-updating: when KIE ships a new model, no code change needed.",
   "type": "module",
   "bin": {
     "dainami-kie-mcp": "dist/index.js"
@@ -29,11 +29,17 @@
     "node": ">=18"
   },
   "license": "MIT",
-  "author": "Dainami",
-  "homepage": "https://github.com/dainami/kie-mcp",
+  "author": {
+    "name": "mrdainami",
+    "url": "https://github.com/mrdainami"
+  },
+  "homepage": "https://github.com/mrdainami/kie-mcp",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dainami/kie-mcp"
+    "url": "https://github.com/mrdainami/kie-mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/mrdainami/kie-mcp/issues"
   },
   "keywords": [
     "mcp",

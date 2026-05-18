@@ -1,8 +1,10 @@
 # @dainami/kie-mcp
 
-> A tiny MCP server that lets Claude (Desktop, Code, or any MCP client) call **any** KIE.ai model on your behalf — images, video, music, anything KIE ships.
+> Let Claude generate **images, videos, and music** with the latest AI models — Seedance, Kling, GPT Image 2, Nano Banana, Suno V4, and anything new KIE ships — without leaving the chat.
 
-It's intentionally dumb on purpose: **3 generic tools** instead of one tool per model. Claude reads the JSON shape from [docs.kie.ai](https://docs.kie.ai) when it needs to, and constructs the payload itself. When KIE adds a new model tomorrow, this package doesn't have to change.
+A tiny MCP server that lets Claude (Desktop, Code, or any MCP client) call **any** model on [KIE.ai](https://kie.ai) on your behalf. Make a 9:16 video with Seedance 2.0 Pro. Edit a product photo with Nano Banana 2. Render a 5-panel storyboard with GPT Image 2. Compose a soundtrack with Suno V4.
+
+It's intentionally **dumb on purpose**: 3 generic tools instead of one tool per model. Claude reads the JSON shape from [docs.kie.ai](https://docs.kie.ai) when it needs to, and constructs the payload itself. When KIE ships a new model tomorrow, this package doesn't have to update — Claude just points at the new docs.
 
 ---
 
@@ -177,4 +179,4 @@ When KIE ships a new model tomorrow, no PR here. Just point your agent's knowled
 
 MIT — see [LICENSE](./LICENSE).
 
-Built for the [AINIO Story Ads Project](https://github.com/mrdainami/ainio-story-ads). PRs and issues welcome.
+By [mrdainami](https://github.com/mrdainami). PRs and issues welcome.
