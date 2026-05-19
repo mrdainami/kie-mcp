@@ -1,6 +1,6 @@
 {
   "name": "@dainami/kie-mcp",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Generate images, videos, and music with the latest AI models — Seedance, Kling, GPT Image 2, Nano Banana, Suno V4 — via KIE.ai from any MCP client. Auto-updating: when KIE ships a new model, no code change needed.",
   "type": "module",
   "bin": {
@@ -18,7 +18,8 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.4"
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "undici": "^6.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

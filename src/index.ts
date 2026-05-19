@@ -18,6 +18,15 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { fetch as undiciFetch } from "undici";
+
+// Explicit fetch import — some MCP host runtimes (notably Claude Cowork) don't
+// expose Node's global `fetch` even though they ship Node 18+. Importing from
+// undici (which powers global fetch under the hood) makes the server portable
+// across hosts.
+const fetchImpl: typeof globalThis.fetch =
+  (globalThis as { fetch?: typeof globalThis.fetch }).fetch ??
+  (undiciFetch as unknown as typeof globalThis.fetch);
 
 const KIE_API_KEY = process.env.KIE_API_KEY;
 const KIE_BASE_URL = (process.env.KIE_BASE_URL ?? "https://api.kie.ai").replace(/\/+$/, "");
@@ -39,7 +48,7 @@ async function kieFetch(
   body?: unknown,
 ): Promise<FetchResult> {
   const url = path.startsWith("http") ? path : `${KIE_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
-  const res = await fetch(url, {
+  const res = await fetchImpl(url, {
     method,
     headers: {
       Authorization: `Bearer ${KIE_API_KEY}`,
