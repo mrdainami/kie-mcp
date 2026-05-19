@@ -2,7 +2,7 @@
   "dxt_version": "0.1",
   "name": "kie-mcp",
   "display_name": "KIE.ai — image, video, and music generation",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Generate images, videos, and music with the latest AI models — Seedance, Kling, GPT Image 2, Nano Banana, Suno — through KIE.ai.",
   "long_description": "Let Claude generate media with any model on KIE.ai. Make a 9:16 video with Seedance 2.0 Pro. Edit a product photo with Nano Banana 2. Render a 5-panel storyboard with GPT Image 2. Compose a soundtrack with Suno V4. The server is a thin HTTP shim, so when KIE adds a new model tomorrow, nothing here needs updating — Claude reads the JSON shape from https://docs.kie.ai and constructs the call itself. Three generic tools (kie_post, kie_get, kie_run_and_wait) cover everything KIE offers, present and future.",
   "author": {

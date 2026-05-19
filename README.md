@@ -126,7 +126,7 @@ Override only if a specific model uses a non-standard envelope.
 | Variable | Default | Required |
 |---|---|---|
 | `KIE_API_KEY` | — | **Yes** |
-| `KIE_BASE_URL` | `https://api.kieai.com` | No (override for testing / proxy) |
+| `KIE_BASE_URL` | `https://api.kie.ai` | No (override for testing / proxy) |
 
 ---
 

@@ -20,7 +20,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 const KIE_API_KEY = process.env.KIE_API_KEY;
-const KIE_BASE_URL = (process.env.KIE_BASE_URL ?? "https://api.kieai.com").replace(/\/+$/, "");
+const KIE_BASE_URL = (process.env.KIE_BASE_URL ?? "https://api.kie.ai").replace(/\/+$/, "");
 
 if (!KIE_API_KEY) {
   console.error("[dainami-kie-mcp] KIE_API_KEY environment variable is required");
@@ -146,7 +146,7 @@ async function runAndWait(args: RunAndWaitArgs) {
 }
 
 const server = new Server(
-  { name: "dainami-kie-mcp", version: "0.1.0" },
+  { name: "dainami-kie-mcp", version: "0.1.2" },
   { capabilities: { tools: {} } },
 );
 
@@ -162,7 +162,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           path: {
             type: "string",
             description:
-              "Path relative to KIE base URL (default https://api.kieai.com). Example: '/api/v1/gpt4o-image/generate'. Full URLs are also accepted.",
+              "Path relative to KIE base URL (default https://api.kie.ai). Example: '/api/v1/jobs/createTask'. Full URLs are also accepted.",
           },
           body: {
             type: "object",
