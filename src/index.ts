@@ -7,6 +7,10 @@
  * and constructs the payload itself. This file never needs to know about gpt-image-2
  * vs seedance vs suno.
  *
+ * HTTP is done with Node's built-in `node:https` module — no fetch, no axios,
+ * no undici. Some MCP host runtimes (notably Claude Cowork) don't expose global
+ * `fetch` and block the undici module loader. `node:https` always works.
+ *
  * Tools:
  *   kie_post(path, body)           — POST to any KIE endpoint
  *   kie_get(path)                  — GET (typically polling)
@@ -18,15 +22,8 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { fetch as undiciFetch } from "undici";
-
-// Explicit fetch import — some MCP host runtimes (notably Claude Cowork) don't
-// expose Node's global `fetch` even though they ship Node 18+. Importing from
-// undici (which powers global fetch under the hood) makes the server portable
-// across hosts.
-const fetchImpl: typeof globalThis.fetch =
-  (globalThis as { fetch?: typeof globalThis.fetch }).fetch ??
-  (undiciFetch as unknown as typeof globalThis.fetch);
+import * as https from "node:https";
+import * as http from "node:http";
 
 const KIE_API_KEY = process.env.KIE_API_KEY;
 const KIE_BASE_URL = (process.env.KIE_BASE_URL ?? "https://api.kie.ai").replace(/\/+$/, "");
@@ -42,30 +39,108 @@ type FetchResult = {
   body: unknown;
 };
 
+type HttpHeaders = Record<string, string>;
+
+/**
+ * Minimal fetch-like wrapper over node:http(s).request with redirect handling.
+ * Returns the raw body as a string; callers parse JSON themselves.
+ */
+function httpRequest(
+  method: string,
+  urlStr: string,
+  headers: HttpHeaders,
+  body?: string,
+  redirectCount = 0,
+): Promise<{ status: number; body: string; headers: NodeJS.Dict<string | string[]> }> {
+  return new Promise((resolve, reject) => {
+    let u: URL;
+    try {
+      u = new URL(urlStr);
+    } catch (e) {
+      reject(new Error(`Invalid URL: ${urlStr}`));
+      return;
+    }
+    const lib = u.protocol === "https:" ? https : http;
+
+    const reqHeaders: HttpHeaders = { ...headers };
+    if (body !== undefined && !reqHeaders["Content-Length"]) {
+      reqHeaders["Content-Length"] = String(Buffer.byteLength(body));
+    }
+
+    const req = lib.request(
+      {
+        method,
+        protocol: u.protocol,
+        hostname: u.hostname,
+        port: u.port || (u.protocol === "https:" ? 443 : 80),
+        path: `${u.pathname}${u.search}`,
+        headers: reqHeaders,
+      },
+      (res) => {
+        const status = res.statusCode ?? 0;
+
+        // Follow redirects (up to 5)
+        const location = res.headers.location;
+        if (
+          [301, 302, 303, 307, 308].includes(status) &&
+          typeof location === "string" &&
+          redirectCount < 5
+        ) {
+          // Consume the body to free the socket
+          res.resume();
+          // 303 always becomes GET; 301/302 historically become GET; 307/308 keep method
+          const newMethod =
+            status === 307 || status === 308 ? method : "GET";
+          const newBody = newMethod === method ? body : undefined;
+          const nextUrl = new URL(location, urlStr).toString();
+          resolve(httpRequest(newMethod, nextUrl, headers, newBody, redirectCount + 1));
+          return;
+        }
+
+        const chunks: Buffer[] = [];
+        res.on("data", (c: Buffer) => chunks.push(c));
+        res.on("end", () => {
+          resolve({
+            status,
+            body: Buffer.concat(chunks).toString("utf8"),
+            headers: res.headers,
+          });
+        });
+        res.on("error", reject);
+      },
+    );
+
+    req.on("error", reject);
+    if (body !== undefined) req.write(body);
+    req.end();
+  });
+}
+
 async function kieFetch(
   method: "GET" | "POST",
   path: string,
   body?: unknown,
 ): Promise<FetchResult> {
   const url = path.startsWith("http") ? path : `${KIE_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
-  const res = await fetchImpl(url, {
+  const res = await httpRequest(
     method,
-    headers: {
+    url,
+    {
       Authorization: `Bearer ${KIE_API_KEY}`,
       "Content-Type": "application/json",
       // Disable gzip — some KIE responses gzip silently and confuse downstream parsers
       "Accept-Encoding": "identity",
     },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-  const text = await res.text();
-  let parsed: unknown = text;
+    body !== undefined ? JSON.stringify(body) : undefined,
+  );
+
+  let parsed: unknown = res.body;
   try {
-    parsed = text.length > 0 ? JSON.parse(text) : null;
+    parsed = res.body.length > 0 ? JSON.parse(res.body) : null;
   } catch {
     // leave as text
   }
-  return { status: res.status, ok: res.ok, body: parsed };
+  return { status: res.status, ok: res.status >= 200 && res.status < 300, body: parsed };
 }
 
 function getByPath(obj: unknown, path: string): unknown {
@@ -89,9 +164,6 @@ type RunAndWaitArgs = {
 };
 
 async function runAndWait(args: RunAndWaitArgs) {
-  // KIE's unified API: POST /api/v1/jobs/createTask returns { data: { taskId } };
-  // GET /api/v1/jobs/recordInfo?taskId=X returns { data: { state: "success"|"failed"|"waiting"|... } }.
-  // Override the defaults if a model uses a different envelope (check docs.kie.ai).
   const taskIdPath = args.taskIdPath ?? "data.taskId";
   const stateField = args.stateField ?? "data.state";
   const successValue = args.successValue ?? "success";
@@ -127,7 +199,13 @@ async function runAndWait(args: RunAndWaitArgs) {
     if (pollRes.ok) {
       const state = getByPath(pollRes.body, stateField);
       if (state === successValue || String(state) === String(successValue)) {
-        return { ok: true, taskId, polls, response: pollRes };
+        return {
+          ok: true,
+          stage: "complete" as const,
+          taskId,
+          polls,
+          response: pollRes,
+        };
       }
       if (state === failValue || String(state) === String(failValue)) {
         return {
@@ -135,27 +213,25 @@ async function runAndWait(args: RunAndWaitArgs) {
           stage: "poll" as const,
           taskId,
           polls,
-          error: `KIE state=${JSON.stringify(state)}`,
           response: pollRes,
         };
       }
     }
 
-    await new Promise((resolve) => setTimeout(resolve, intervalSec * 1000));
+    await new Promise((r) => setTimeout(r, intervalSec * 1000));
   }
 
   return {
     ok: false,
     stage: "timeout" as const,
-    taskId,
+    timeoutSec,
     polls,
-    error: `Timed out after ${timeoutSec}s`,
-    lastPoll,
+    response: lastPoll,
   };
 }
 
 const server = new Server(
-  { name: "dainami-kie-mcp", version: "0.1.2" },
+  { name: "dainami-kie-mcp", version: "0.1.4" },
   { capabilities: { tools: {} } },
 );
 
@@ -164,91 +240,46 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "kie_post",
       description:
-        "POST to any KIE endpoint. Use this to submit a generation task for any KIE model (gpt-image-2, nano-banana-2, bytedance/seedance-2, kling-3.0, suno-v4, etc.). Construct `body` from the model's docs at https://docs.kie.ai — every model has its own JSON shape (different field names, duration ranges, aspect ratios). Returns the raw KIE response (typically `{ code, msg, data: { taskId } }`). For most jobs you'll want kie_run_and_wait instead — only use this directly if you need custom polling.",
+        "POST to any KIE.ai endpoint. Used to submit generation tasks. Returns { status, ok, body }. The agent reads docs.kie.ai for the JSON shape each model expects.",
       inputSchema: {
         type: "object",
         properties: {
-          path: {
-            type: "string",
-            description:
-              "Path relative to KIE base URL (default https://api.kie.ai). Example: '/api/v1/jobs/createTask'. Full URLs are also accepted.",
-          },
-          body: {
-            type: "object",
-            description:
-              "JSON body for the model. Shape comes from https://docs.kie.ai for the specific model you're calling.",
-            additionalProperties: true,
-          },
+          path: { type: "string", description: "Endpoint path (e.g. '/api/v1/jobs/createTask') or full URL." },
+          body: { type: "object", description: "Request body as JSON.", additionalProperties: true },
         },
         required: ["path", "body"],
-        additionalProperties: false,
       },
     },
     {
       name: "kie_get",
       description:
-        "GET from any KIE endpoint. Primary use: poll a task by ID once. Returns whatever KIE returns. For polling loops use kie_run_and_wait instead — only call this directly when you need fine control over poll timing (e.g. expensive Suno tasks where you want to space out polls).",
+        "GET from any KIE.ai endpoint. Typically used for polling task status (e.g. '/api/v1/jobs/recordInfo?taskId=...'). Returns { status, ok, body }.",
       inputSchema: {
         type: "object",
         properties: {
-          path: {
-            type: "string",
-            description:
-              "Path relative to KIE base URL. Example: '/api/v1/gpt4o-image/record-info?taskId=abc123'.",
-          },
+          path: { type: "string", description: "Endpoint path or full URL." },
         },
         required: ["path"],
-        additionalProperties: false,
       },
     },
     {
       name: "kie_run_and_wait",
       description:
-        "Submit a generation task and poll until it completes (or fails / times out). The everyday tool for KIE work. Defaults match KIE's unified jobs API: POST /api/v1/jobs/createTask returns { data: { taskId } }; GET /api/v1/jobs/recordInfo?taskId=X returns { data: { state: 'success'|'failed'|'waiting'|'generating' } }. Override only if a specific model uses a non-unified envelope (rare — check https://docs.kie.ai).",
+        "Submit a task to KIE and poll until it completes. Default polling: every 8s, timeout 900s (15min). Override taskIdPath / stateField / successValue / failValue per model if the endpoint uses a non-default envelope.",
       inputSchema: {
         type: "object",
         properties: {
-          submitPath: {
-            type: "string",
-            description:
-              "POST endpoint to submit the task. Usually '/api/v1/jobs/createTask' (unified) — model goes inside body.",
-          },
-          body: {
-            type: "object",
-            description:
-              "JSON body to submit. For unified API: { model: '<model-id>', input: { ... } }. Shape comes from https://docs.kie.ai.",
-            additionalProperties: true,
-          },
-          pollPath: {
-            type: "string",
-            description:
-              "GET endpoint for polling. Use '{taskId}' as a placeholder. Usually '/api/v1/jobs/recordInfo?taskId={taskId}'.",
-          },
-          taskIdPath: {
-            type: "string",
-            description: "Dot path to extract taskId from submit response. Default 'data.taskId'.",
-          },
-          stateField: {
-            type: "string",
-            description: "Dot path to the state value in poll response. Default 'data.state'.",
-          },
-          successValue: {
-            description: "Value of stateField that means done. Default 'success'.",
-          },
-          failValue: {
-            description: "Value of stateField that means failed. Default 'failed'.",
-          },
-          timeoutSec: {
-            type: "number",
-            description: "Max wait seconds. Default 900 (15 min). Use 1800+ for Suno music.",
-          },
-          intervalSec: {
-            type: "number",
-            description: "Poll interval seconds. Default 8.",
-          },
+          submitPath: { type: "string", description: "POST path for task submission. Usually '/api/v1/jobs/createTask'." },
+          body: { type: "object", description: "Submit body.", additionalProperties: true },
+          pollPath: { type: "string", description: "GET path with '{taskId}' placeholder. Usually '/api/v1/jobs/recordInfo?taskId={taskId}'." },
+          taskIdPath: { type: "string", description: "Path to taskId in submit response. Default 'data.taskId'." },
+          stateField: { type: "string", description: "Path to state field in poll response. Default 'data.state'." },
+          successValue: { type: "string", description: "Value that signals success. Default 'success'." },
+          failValue: { type: "string", description: "Value that signals failure. Default 'failed'." },
+          timeoutSec: { type: "number", description: "Max seconds to poll. Default 900." },
+          intervalSec: { type: "number", description: "Seconds between polls. Default 8." },
         },
         required: ["submitPath", "body", "pollPath"],
-        additionalProperties: false,
       },
     },
   ],
@@ -293,4 +324,4 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
-console.error(`[dainami-kie-mcp] running on stdio — base ${KIE_BASE_URL}`);
+console.error(`[dainami-kie-mcp] running on stdio (v0.1.4 — node:https, no fetch dep)`);
