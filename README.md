@@ -122,7 +122,7 @@ On Windows, the config file lives at `%APPDATA%\Claude\claude_desktop_config.jso
 
 ### 5. Try it
 
-In co-work, ask: *"Make me a 9:16 video of a coffee cup using Seedance."* Claude should call the `kie_run_and_wait` tool and return a video URL when it's done.
+In co-work, ask: *"Make me a 9:16 video of a coffee cup using Seedance."* Claude will submit the job with `kie_post`, poll with `kie_get`, and return the video URL when it's done.
 
 **If something goes wrong:**
 - "command not found: npm" → Node.js isn't installed. Redo step 2.
@@ -133,55 +133,43 @@ In co-work, ask: *"Make me a 9:16 video of a coffee cup using Seedance."* Claude
 
 ## What the agent does with these tools
 
-Typical flow for "make me an image with GPT Image 2":
+Generation on KIE is **asynchronous** — submit a job, then poll for the result. Typical flow for "make me an image with GPT Image 2":
 
-1. Agent thinks: "I need GPT Image 2."
-2. Agent (optionally) WebFetches `https://docs.kie.ai/gpt-image-2` to confirm the current JSON shape.
-3. Agent calls `kie_run_and_wait`:
+1. Agent (optionally) calls `kie_fetch_model_docs` to confirm the model's current JSON shape.
+2. Agent **submits** with `kie_post`:
    ```ts
-   kie_run_and_wait({
-     submitPath: "/api/v1/jobs/createTask",
+   kie_post({
+     path: "/api/v1/jobs/createTask",
      body: {
        model: "gpt-image-2",
-       input: {
-         prompt: "A serene cabin in the mountains, golden hour",
-         aspect_ratio: "9:16",
-         quality: "high"
-       }
-     },
-     pollPath: "/api/v1/jobs/recordInfo?taskId={taskId}"
+       input: { prompt: "A serene cabin in the mountains, golden hour", aspect_ratio: "9:16", quality: "high" }
+     }
    })
+   // → body.data.taskId — save this immediately
    ```
-4. MCP submits to KIE → polls every 8s → returns the result URL when `state === "success"`.
+3. Agent **polls** with `kie_get` every ~20–30s until done:
+   ```ts
+   kie_get({ path: "/api/v1/jobs/recordInfo?taskId=..." })
+   // data.state: waiting | generating | success | fail
+   // on success → data.resultJson.resultUrls[]
+   ```
+4. Agent **saves** the result with `kie_download({ url, destPath })`.
+
+> Cost is billed on **submit**, not on poll. Persist the `taskId` right after submitting, and never resubmit a live task.
 
 ---
 
-## The 3 tools
+## The 5 tools
 
-### `kie_post(path, body)`
+| Tool | What it does |
+|---|---|
+| `kie_post(path, body)` | POST to any KIE endpoint — **submit** a generation task (usually `/api/v1/jobs/createTask`). |
+| `kie_get(path)` | GET from any KIE endpoint — **poll** task status (usually `/api/v1/jobs/recordInfo?taskId=...`). |
+| `kie_upload_file(localPath, uploadPath?)` | Upload a local file to KIE storage → returns a hosted URL (~3-day TTL) for use as an `@Image`/`@Video` reference. |
+| `kie_download(url, destPath)` | Download a result URL to local disk (creates parent folders). |
+| `kie_fetch_model_docs(path \| url, force?)` | Fetch a model's live docs from docs.kie.ai (cached ~3 days) so the agent knows the exact payload shape. |
 
-POST to any KIE endpoint. Returns whatever KIE returns. Use when you want fine control.
-
-### `kie_get(path)`
-
-GET from any KIE endpoint (typically polling a task by ID).
-
-### `kie_run_and_wait(submitPath, body, pollPath, …)`
-
-Submit a task and poll until done. **Use this 90% of the time.**
-
-Defaults match KIE's unified jobs API:
-
-| Param | Default | What it means |
-|---|---|---|
-| `taskIdPath` | `data.taskId` | Where the taskId lives in the submit response |
-| `stateField` | `data.state` | Field in poll response that signals state |
-| `successValue` | `"success"` | State value that means done |
-| `failValue` | `"failed"` | State value that means failure |
-| `timeoutSec` | `900` (15 min) | Bump to 1800+ for Suno music |
-| `intervalSec` | `8` | Poll cadence |
-
-Override only if a specific model uses a non-standard envelope.
+Different model families use slightly different envelopes (Veo, Suno, Flux-Kontext) — the agent reads the model docs and adjusts. The MCP stays generic, so new KIE models work without updating this package.
 
 ---
 
