@@ -1,7 +1,7 @@
 {
   "name": "@dainami/kie-mcp",
-  "version": "0.1.4",
-  "description": "Generate images, videos, and music with the latest AI models — Seedance, Kling, GPT Image 2, Nano Banana, Suno V4 — via KIE.ai from any MCP client. Auto-updating: when KIE ships a new model, no code change needed.",
+  "version": "0.3.0",
+  "description": "KIE.ai connector for MCP. Five generic tools — kie_post, kie_get, kie_upload_file, kie_download, kie_fetch_model_docs — give an agent every current and future KIE model. Model specs are pulled live from docs.kie.ai with a 3-day cache; the MCP never bundles per-model docs that go stale.",
   "type": "module",
   "bin": {
     "dainami-kie-mcp": "dist/index.js"
@@ -9,6 +9,7 @@
   "main": "dist/index.js",
   "files": [
     "dist",
+    "resources",
     "README.md",
     "LICENSE"
   ],

@@ -1,10 +1,10 @@
 {
   "dxt_version": "0.1",
   "name": "kie-mcp",
-  "display_name": "KIE.ai — image, video, and music generation",
-  "version": "0.1.4",
-  "description": "Generate images, videos, and music with the latest AI models — Seedance, Kling, GPT Image 2, Nano Banana, Suno — through KIE.ai.",
-  "long_description": "Let Claude generate media with any model on KIE.ai. Make a 9:16 video with Seedance 2.0 Pro. Edit a product photo with Nano Banana 2. Render a 5-panel storyboard with GPT Image 2. Compose a soundtrack with Suno V4. The server is a thin HTTP shim, so when KIE adds a new model tomorrow, nothing here needs updating — Claude reads the JSON shape from https://docs.kie.ai and constructs the call itself. Three generic tools (kie_post, kie_get, kie_run_and_wait) cover everything KIE offers, present and future.",
+  "display_name": "KIE.ai — image, video, music, character generation",
+  "version": "0.3.0",
+  "description": "Generate any media on KIE.ai (Seedance, Kling, Veo, Nano Banana, GPT Image, Suno, Sora, Wan, Gemini Omni, …) through a small set of generic tools that discover models from live docs.",
+  "long_description": "Connector for KIE.ai. Five tools — kie_post, kie_get, kie_upload_file, kie_download, kie_fetch_model_docs — give an agent access to every current and future KIE model. The MCP itself owns KIE's job lifecycle (submit + poll envelope, file upload, gotchas) and ships a flat index of every model with a link to its live docs page. Per-model payload shapes are pulled from docs.kie.ai on demand and cached locally for ~3 days, so brand-new KIE models work the moment they ship and no model goes stale waiting for an MCP update. Use this MCP from any project; project-specific behaviour (gates, recipes, naming) lives in your project, not here.",
   "author": {
     "name": "mrdainami",
     "url": "https://github.com/mrdainami"
@@ -13,7 +13,7 @@
   "documentation": "https://github.com/mrdainami/kie-mcp#readme",
   "support": "https://github.com/mrdainami/kie-mcp/issues",
   "license": "MIT",
-  "keywords": ["kie", "kie.ai", "image-generation", "video-generation", "ai"],
+  "keywords": ["kie", "kie.ai", "image-generation", "video-generation", "music-generation", "ai"],
   "server": {
     "type": "node",
     "entry_point": "dist/index.js",
@@ -35,9 +35,11 @@
     }
   },
   "tools": [
-    { "name": "kie_post", "description": "POST to any KIE endpoint." },
-    { "name": "kie_get", "description": "GET from any KIE endpoint (typically polling)." },
-    { "name": "kie_run_and_wait", "description": "Submit a task and poll until done." }
+    { "name": "kie_post", "description": "POST to any KIE endpoint (usually createTask)." },
+    { "name": "kie_get", "description": "GET from any KIE endpoint (usually recordInfo for polling)." },
+    { "name": "kie_upload_file", "description": "Upload a local file to KIE storage; returns a hosted URL (~3d TTL)." },
+    { "name": "kie_download", "description": "Download a URL (e.g. a KIE result) to a local file." },
+    { "name": "kie_fetch_model_docs", "description": "Fetch a model's live docs page from docs.kie.ai (cached ~3 days)." }
   ],
   "compatibility": {
     "claude_desktop": ">=0.10.0",
