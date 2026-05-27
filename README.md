@@ -4,30 +4,55 @@
 
 A tiny MCP server that lets Claude (Desktop, Code, or any MCP client) call **any** model on [KIE.ai](https://kie.ai) on your behalf. Make a 9:16 video with Seedance 2.0 Pro. Edit a product photo with Nano Banana 2. Render a 5-panel storyboard with GPT Image 2. Compose a soundtrack with Suno V4.
 
-It's intentionally **dumb on purpose**: 3 generic tools instead of one tool per model. Claude reads the JSON shape from [docs.kie.ai](https://docs.kie.ai) when it needs to, and constructs the payload itself. When KIE ships a new model tomorrow, this package doesn't have to update — Claude just points at the new docs.
+It's intentionally **dumb on purpose**: 5 generic tools instead of one tool per model. Claude reads the JSON shape from [docs.kie.ai](https://docs.kie.ai) when it needs to, and constructs the payload itself. When KIE ships a new model tomorrow, this package doesn't have to update — Claude just points at the new docs.
 
 ---
 
 ## Which install do I need?
 
-Claude Desktop has two different chat modes, and they install MCPs differently:
+Pick the row that matches how you run Claude:
 
-- **Regular Claude Desktop chat** → use **Path A** (drag-and-drop, 2 minutes, no terminal). The easy one.
-- **Claude co-work** → use **Path B** (download source, build once, edit a config file). Co-work ignores `.mcpb` files, so you have to set it up by hand.
+- **Claude Code (terminal)** → use **Quick start: Claude Code** below — one command, the fastest option.
+- **Regular Claude Desktop chat** → use **Path A** (drag-and-drop `.mcpb`, 2 minutes, no terminal).
+- **Claude Desktop co-work** → use **Path B** (download source, build once, edit a config file). Co-work ignores `.mcpb` files, so you set it up by hand.
 
-If you use both modes, do Path B — it works for both.
+If you use both Desktop modes, do Path B — it works for both.
+
+---
+
+## Quick start: Claude Code (fastest)
+
+One command — no `.mcpb`, no JSON editing.
+
+1. **Get a KIE.ai API key** at [kie.ai](https://kie.ai) → Dashboard → API Keys.
+2. **Clone + build** (once, somewhere permanent):
+
+   ```bash
+   git clone https://github.com/mrdainami/kie-mcp.git ~/mcp/kie-mcp
+   cd ~/mcp/kie-mcp && npm install && npm run build
+   ```
+
+3. **Register it** (`--scope user` makes it available in every project; drop it to add only to the current project):
+
+   ```bash
+   claude mcp add --scope user kie --env KIE_API_KEY=YOUR_KEY -- node ~/mcp/kie-mcp/dist/index.js
+   ```
+
+4. **Verify:** `claude mcp list` should show `kie  ✓ Connected`.
+
+Your key lives in Claude Code's own config, never in this repo. To update later: `git pull && npm run build` in the folder, then restart Claude Code.
 
 ---
 
 ## Path A — Regular Claude Desktop (drag-and-drop)
 
 1. **Get a KIE.ai API key** at [kie.ai](https://kie.ai) → Dashboard → API Keys. Copy it somewhere — you'll paste it in step 4.
-2. **Download `kie-mcp-0.1.4.mcpb`** from the [latest release](https://github.com/mrdainami/kie-mcp/releases).
+2. **Download the latest `.mcpb`** from the [releases page](https://github.com/mrdainami/kie-mcp/releases).
 3. **Drag that file onto the Claude Desktop window** (or open Settings → Extensions and pick it).
 4. When Claude pops up a box asking for your KIE API key, paste it.
 5. **Quit Claude Desktop fully and reopen it.**
 
-Done. To check it's connected, open a chat → click the **+** button → **Connectors** — you should see "KIE.ai" listed with 3 tools.
+Done. To check it's connected, open a chat → click the **+** button → **Connectors** — you should see "KIE.ai" listed with its tools.
 
 > **Why `.mcpb`?** It's Anthropic's drag-and-drop install format for local MCP servers. No JSON editing, no Node.js install required (Claude Desktop bundles its own Node runtime). [Read more →](https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop)
 
