@@ -110,6 +110,7 @@ If a model isn't in this index but you've seen it on https://kie.ai/market or ht
 | Wan 2.2 Animate (replace) | `wan/2-2-animate-replace` |
 | Grok Imagine (text-to-video) | `grok-imagine/text-to-video` |
 | Grok Imagine (image-to-video) | `grok-imagine/image-to-video` |
+| Grok Imagine Video 1.5 Preview (text/image-to-video) — slug: `grok-imagine-video-1-5-preview` | `grok-imagine/1-5-preview` |
 | Grok Imagine Upscale | `grok-imagine/upscale` |
 | Grok Imagine Extend | `grok-imagine/extend` |
 | Sora 2 (text-to-video) | `sora-2-text-to-video` |
@@ -163,6 +164,38 @@ If a model isn't in this index but you've seen it on https://kie.ai/market or ht
 | ElevenLabs TTS Turbo 2.5 | `elevenlabs/text-to-speech-turbo-2-5` |
 | ElevenLabs Audio Isolation | `elevenlabs/audio-isolation` |
 
+## LLM / Text (chat & messages)
+
+⚠️ **These are SYNCHRONOUS chat/messages endpoints — NOT the async `createTask` / `recordInfo` job envelope.** You call them and get the completion back directly (or as an SSE stream when `stream: true`). There is no `taskId` and nothing to poll. Each provider uses its own endpoint path and body shape, so **always `kie_fetch_model_docs` the model first** for the exact path, body fields, and slug. Set `stream: false` if you want a single JSON response instead of SSE.
+
+| Model | Docs path | Endpoint (verify in docs) | Body style |
+|---|---|---|---|
+| Claude Opus 4.8 | `claude/claude-opus-4-8` | `POST /claude/v1/messages` | Anthropic Messages (`messages`, `max_tokens`, `tools`, `thinkingFlag`, `stream`) |
+| Claude Opus 4.7 | `claude/claude-opus-4-7` | `POST /claude/v1/messages` | Anthropic Messages |
+| Claude Opus 4.6 | `claude/claude-opus-4-6` | `POST /claude/v1/messages` | Anthropic Messages |
+| Claude Opus 4.5 | `claude/claude-opus-4-5` | `POST /claude/v1/messages` | Anthropic Messages |
+| Claude Sonnet 4.6 | `claude/claude-sonnet-4-6` | `POST /claude/v1/messages` | Anthropic Messages |
+| Claude Sonnet 4.5 | `claude/claude-sonnet-4-5` | `POST /claude/v1/messages` | Anthropic Messages |
+| Claude Haiku 4.5 | `claude/claude-haiku-4-5` | `POST /claude/v1/messages` | Anthropic Messages |
+| GPT-5.5 | `chat/gpt-5-5` | `POST /codex/v1/responses` | OpenAI Responses |
+| GPT-5.4 | `chat/gpt-5-4` | `POST /codex/v1/responses` | OpenAI Responses |
+| GPT-5.2 | `chat/gpt-5-2` | `POST /codex/v1/responses` | OpenAI Responses |
+| GPT Codex | `codex/gpt-codex` | `POST /codex/v1/responses` | OpenAI Responses |
+| Gemini 3 Pro | `gemini/gemini-3-pro` | `POST /gemini-3-pro/v1/chat/completions` | OpenAI chat-completions (per-model path) |
+| Gemini 3.1 Pro | `gemini/gemini-3-1-pro` | `POST /<model>/v1/chat/completions` | OpenAI chat-completions |
+| Gemini 3 Flash | `gemini/gemini-3-flash` | `POST /<model>/v1/chat/completions` | OpenAI chat-completions |
+| Gemini 3 Flash (v1beta) | `gemini/gemini-3-flash-v1beta` | `POST /<model>/v1/chat/completions` | OpenAI chat-completions |
+| Gemini 3.5 Flash | `gemini/gemini-3-5-flash` | `POST /<model>/v1/chat/completions` | OpenAI chat-completions |
+| Gemini 3.5 Flash (OpenAI-compat) | `gemini/gemini-3-5-flash-openai` | `POST /<model>/v1/chat/completions` | OpenAI chat-completions |
+| Gemini 2.5 Pro | `gemini/gemini-2-5-pro` | `POST /<model>/v1/chat/completions` | OpenAI chat-completions |
+| Gemini 2.5 Flash | `gemini/gemini-2-5-flash` | `POST /<model>/v1/chat/completions` | OpenAI chat-completions |
+
+## Utility
+
+| Endpoint | Docs path |
+|---|---|
+| Get Task Detail (generic task status lookup) | `common/get-task-detail` |
+
 ---
 
 ## Custom-envelope models — read these before you call
@@ -176,6 +209,7 @@ Most models use the **Standard envelope** (`POST /api/v1/jobs/createTask` + `GET
 - **Gemini Omni Character + Audio** — **synchronous endpoints**, no polling. Returns the asset ID directly. Their outputs feed into `gemini-omni-video`.
 - **Midjourney** — own endpoint `/api/v1/mj/generate`.
 - **GPT-4o Image** — own endpoint `/api/v1/gpt4o-image/generate`.
+- **LLM / Text models (Claude, GPT-5/Codex, Gemini)** — **synchronous, no job/poll at all.** Claude → `POST /claude/v1/messages` (Anthropic Messages body). GPT-5/Codex → `POST /codex/v1/responses` (OpenAI Responses body). Gemini → `POST /<model>/v1/chat/completions` (OpenAI chat-completions, path embeds the slug). Response is direct JSON, or SSE when `stream:true` — set `stream:false` for a single JSON blob. Fetch the model docs for exact fields before calling.
 
 When the model entry above is flagged with ⚠️, always read the docs page before constructing the body.
 
