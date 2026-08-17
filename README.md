@@ -24,7 +24,7 @@ Then find your app below:
 | Codex CLI | Paste one command | Yes |
 | Claude Code | Paste one command | Yes |
 
-Node.js is a free runtime the connector runs on. If your app needs it, download the LTS installer from [nodejs.org](https://nodejs.org) and click through it once. Claude Desktop skips this because it has its own copy built in.
+Node.js is a free runtime the connector runs on. If your app needs it, go to [nodejs.org](https://nodejs.org), click **Get Node.js**, download the installer for your computer, and click through it once. Claude Desktop skips this because it has its own copy built in.
 
 ---
 
@@ -43,7 +43,7 @@ This covers cowork too. Connectors installed in Claude Desktop are shared with c
 
 ## Codex (ChatGPT desktop app)
 
-1. Install [Node.js](https://nodejs.org) (the LTS button) if you don't have it yet.
+1. Install [Node.js](https://nodejs.org) if you don't have it yet: click **Get Node.js** on that page, download the installer, click through it.
 2. Get the path to the connector file. In Finder, open your `kie-mcp` folder, then the `dist` folder inside it, and find `index.js`. Right-click it, hold the **Option** key, and choose **Copy "index.js" as Pathname**.
 3. In the ChatGPT desktop app, open the Codex side, click your account name (bottom left), then **Settings**, then **MCP servers**, then **Add server**.
 4. On the **STDIO** tab, fill in:
