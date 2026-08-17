@@ -2,150 +2,90 @@
 
 > Let your AI agent generate **images, videos, and music** with the latest AI models — Seedance, Kling, GPT Image 2, Nano Banana, Suno V4, and anything new KIE ships — without leaving the chat.
 
-A tiny MCP server that lets **Claude (Code or Desktop), Codex (CLI or app), or any MCP client** call **any** model on [KIE.ai](https://kie.ai) on your behalf. Make a 9:16 video with Seedance 2.0 Pro. Edit a product photo with Nano Banana 2. Render a 5-panel storyboard with GPT Image 2. Compose a soundtrack with Suno V4.
+A tiny MCP server that lets **Claude (Code or Desktop), Codex, or any MCP client** call **any** model on [KIE.ai](https://kie.ai) on your behalf. Make a 9:16 video with Seedance 2.0 Pro. Edit a product photo with Nano Banana 2. Render a 5-panel storyboard with GPT Image 2. Compose a soundtrack with Suno V4.
 
 It's intentionally **dumb on purpose**: 5 generic tools instead of one tool per model. The agent reads the JSON shape from [docs.kie.ai](https://docs.kie.ai) when it needs to, and constructs the payload itself. When KIE ships a new model tomorrow, this package doesn't have to update — the agent just points at the new docs.
 
 ---
 
-## Which install do I need?
+## Get set up
 
-Every path needs one thing first: a **KIE.ai API key** — [kie.ai](https://kie.ai) → Dashboard → API Keys. Then pick your app:
+Two things first, same for everyone:
 
-- **Claude Code (terminal)** → one command, see **Claude Code** below.
-- **Codex CLI (terminal)** → one command, see **Codex CLI** below.
-- **Codex desktop app** → a settings form, no terminal, see **Codex app** below.
-- **Regular Claude Desktop chat** → **Path A** (drag-and-drop `.mcpb`, no terminal, no Node.js needed).
-- **Claude Desktop co-work** → **Path B** (manual config file). Co-work ignores `.mcpb` files.
-- **ChatGPT** → not supported. ChatGPT only accepts hosted (remote URL) connectors, and this is a local server.
+1. **Get a KIE.ai API key.** Go to [kie.ai](https://kie.ai), sign in, open Dashboard, then API Keys. Create one and copy it. You will paste it during setup.
+2. **Download the connector.** On this page, click the green **Code** button, then **Download ZIP**. Unzip it and move the `kie-mcp` folder somewhere permanent, like your Documents folder. Your app will point at this folder forever, so don't leave it in Downloads.
 
-Terminal paths use `npx`, which downloads the package from npm automatically — no cloning, no building. You just need [Node.js](https://nodejs.org) installed (the LTS installer, click through it).
+Then find your app below:
+
+| Your app | What setup looks like | Needs Node.js? |
+|---|---|---|
+| Claude Desktop (chat and cowork) | Drag one file in | No |
+| Codex (ChatGPT desktop app) | Fill in a settings form | Yes |
+| Codex CLI | Paste one command | Yes |
+| Claude Code | Paste one command | Yes |
+
+Node.js is a free runtime the connector runs on. If your app needs it, download the LTS installer from [nodejs.org](https://nodejs.org) and click through it once. Claude Desktop skips this because it has its own copy built in.
 
 ---
 
-## Claude Code (one command)
+## Claude Desktop (drag and drop)
 
-```bash
-claude mcp add --scope user kie --env KIE_API_KEY=YOUR_KEY -- npx -y dainami-kie-mcp
-```
+1. Open the folder you downloaded and find **`kie-mcp.mcpb`**. (You can also grab just this file from the [releases page](https://github.com/mrdainami/kie-mcp/releases) and skip the ZIP entirely.)
+2. Drag it onto the Claude Desktop window, or go to Settings, then Extensions, and pick it.
+3. When Claude asks for your KIE API key, paste it.
+4. Quit Claude Desktop fully and reopen it.
 
-(`--scope user` makes it available in every project; drop it to add only to the current project.)
+To check it worked: open a chat, click the **+** button, then **Connectors**. "KIE.ai" should be listed with its tools.
 
-**Verify:** `claude mcp list` should show `kie  ✓ Connected`.
+This covers cowork too. Connectors installed in Claude Desktop are shared with cowork sessions, so there is nothing separate to set up.
 
-Your key lives in Claude Code's own config, never in this repo.
+---
+
+## Codex (ChatGPT desktop app)
+
+1. Install [Node.js](https://nodejs.org) (the LTS button) if you don't have it yet.
+2. Get the path to the connector file. In Finder, open your `kie-mcp` folder, then the `dist` folder inside it, and find `index.js`. Right-click it, hold the **Option** key, and choose **Copy "index.js" as Pathname**.
+3. In the ChatGPT desktop app, open the Codex side, click your account name (bottom left), then **Settings**, then **MCP servers**, then **Add server**.
+4. On the **STDIO** tab, fill in:
+   - **Name:** `kie`
+   - **Command:** `node`
+   - **Arguments:** paste the pathname you copied in step 2
+   - **Environment variables:** `KIE_API_KEY` with your key as the value
+5. Save. `kie` appears in your server list, and the same setup carries over to the Codex CLI and IDE extension automatically.
+
+Then just ask for something: *"Make me a 9:16 video of a coffee cup using Seedance."* Codex asks permission before each kie tool call. Approve them; that is its normal safety prompt, and generation costs KIE credits from your account.
 
 ---
 
 ## Codex CLI (one command)
 
+Paste this in your terminal, with your key and your folder's location filled in:
+
 ```bash
-codex mcp add kie --env KIE_API_KEY=YOUR_KEY -- npx -y dainami-kie-mcp
+codex mcp add kie --env KIE_API_KEY=YOUR_KEY -- node ~/Documents/kie-mcp/dist/index.js
 ```
 
-**Verify:** `codex mcp list` should show `kie` as **enabled**. The same registration also covers the Codex IDE extension and the Codex desktop app — they share one config.
-
-Then just ask Codex for a generation, e.g. *"Make me a 9:16 video of a coffee cup using Seedance."* Codex will ask permission before each kie tool call — approve them; that's its normal safety prompt.
+To check: `codex mcp list` should show `kie` as enabled. The same registration also shows up in the ChatGPT desktop app's Codex settings and the IDE extension; they share one config.
 
 ---
 
-## Codex app (settings form, no terminal)
+## Claude Code (one command)
 
-1. Install [Node.js](https://nodejs.org) (LTS) if you don't have it.
-2. In the Codex app: click your account (bottom-left) → **Settings** → **MCP servers** → **Add server**.
-3. Fill the **STDIO** tab:
-   - **Name:** `kie`
-   - **Command:** `npx`
-   - **Arguments:** `-y dainami-kie-mcp`
-   - **Environment variables:** `KIE_API_KEY` = your key
-4. Save. `kie` appears in your server list, and it works in the app, the CLI, and the IDE extension.
+Paste this in Claude Code, with your key and your folder's location filled in:
 
----
+```bash
+claude mcp add --scope user kie --env KIE_API_KEY=YOUR_KEY -- node ~/Documents/kie-mcp/dist/index.js
+```
 
-## Path A — Regular Claude Desktop (drag-and-drop)
+If you put the folder somewhere other than Documents, adjust the path. `--scope user` makes it available in every project.
 
-1. **Get a KIE.ai API key** at [kie.ai](https://kie.ai) → Dashboard → API Keys. Copy it somewhere — you'll paste it in step 4.
-2. **Download the latest `.mcpb`** from the [releases page](https://github.com/mrdainami/kie-mcp/releases).
-3. **Drag that file onto the Claude Desktop window** (or open Settings → Extensions and pick it).
-4. When Claude pops up a box asking for your KIE API key, paste it.
-5. **Quit Claude Desktop fully and reopen it.**
-
-Done. To check it's connected, open a chat → click the **+** button → **Connectors** — you should see "KIE.ai" listed with its tools.
-
-> **Why `.mcpb`?** It's Anthropic's drag-and-drop install format for local MCP servers. No JSON editing, no Node.js install required (Claude Desktop bundles its own Node runtime). [Read more →](https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop)
+To check: `claude mcp list` should show `kie ✓ Connected`.
 
 ---
 
-## Path B — Claude co-work (manual install)
+## Updating
 
-Co-work doesn't load `.mcpb` files. You have to install Node.js, download this repo, build it once, then point Claude at the built file via the config JSON. One-time setup, ~10 minutes.
-
-### 1. Get your API key
-
-Sign up at [kie.ai](https://kie.ai) → Dashboard → API Keys → copy the key. Keep it handy.
-
-### 2. Install Node.js
-
-If you don't have it: go to [nodejs.org](https://nodejs.org) → click the big **LTS** download button → run the installer → click Next a few times. Done. This adds Node to your system so the MCP can run.
-
-### 3. Download this repo and build it
-
-You only do this once. The folder you create here is **permanent** — Claude will look at it forever, so put it somewhere you won't move or delete (`~/Documents/kie-mcp` is a good spot).
-
-- Go to [github.com/mrdainami/kie-mcp](https://github.com/mrdainami/kie-mcp)
-- Click the green **Code** button → **Download ZIP**
-- Unzip it. Rename the folder from `kie-mcp-main` to `kie-mcp` if you like, and put it in `~/Documents/`.
-- Open **Terminal** (Spotlight → type "Terminal") and run these three lines, one at a time:
-
-  ```bash
-  cd ~/Documents/kie-mcp
-  npm install
-  npm run build
-  ```
-
-  After `npm run build` finishes, you can close Terminal and never open it again.
-
-### 4. Tell Claude where to find it
-
-- In Finder, press **Cmd+Shift+G** and paste this path, then Enter:
-
-  ```
-  ~/Library/Application Support/Claude/
-  ```
-
-- Open `claude_desktop_config.json` in TextEdit (or VS Code, any text editor).
-- If the file is **empty**, paste the whole block below. If it **already has stuff**, just add the `"kie": { ... }` block inside the existing `"mcpServers"` object:
-
-  ```json
-  {
-    "mcpServers": {
-      "kie": {
-        "command": "node",
-        "args": [
-          "/Users/YOUR_USERNAME/Documents/kie-mcp/dist/index.js"
-        ],
-        "env": {
-          "KIE_API_KEY": "paste-your-kie-key-here"
-        }
-      }
-    }
-  }
-  ```
-
-- Replace `YOUR_USERNAME` with your Mac username (Terminal `whoami` tells you if you don't know).
-- Replace `paste-your-kie-key-here` with the key from step 1.
-- Save the file. **Quit Claude Desktop fully and reopen it.**
-
-On Windows, the config file lives at `%APPDATA%\Claude\claude_desktop_config.json` and the `args` path will be a Windows-style path like `C:\\Users\\You\\Documents\\kie-mcp\\dist\\index.js`.
-
-### 5. Try it
-
-In co-work, ask: *"Make me a 9:16 video of a coffee cup using Seedance."* Claude will submit the job with `kie_post`, poll with `kie_get`, and return the video URL when it's done.
-
-**If something goes wrong:**
-- "command not found: npm" → Node.js isn't installed. Redo step 2.
-- "module not found" / "ENOENT dist/index.js" → you skipped `npm run build` in step 3. Run it again.
-- The MCP shows up but every call fails with an auth error → your `KIE_API_KEY` is wrong or missing. Re-check step 4.
+When a new version ships: download the ZIP again and replace your `kie-mcp` folder's contents. Your API key lives in your app's settings, not in the folder, so nothing else needs to change. Claude Desktop users drag in the new `.mcpb` instead.
 
 ---
 
@@ -202,14 +142,24 @@ Different model families use slightly different envelopes (Veo, Suno, Flux-Konte
 
 ## Develop locally
 
+The repo ships the built `dist/index.js` (a single self-contained bundle), so users never build anything. To hack on the source:
+
 ```bash
 git clone https://github.com/mrdainami/kie-mcp
 cd kie-mcp
 npm install
-npm run build
+npm run build   # rebuilds dist/index.js via esbuild
 ```
 
-Point Claude at your local copy:
+For dev with auto-reload:
+
+```bash
+KIE_API_KEY=kie-... npm run dev
+```
+
+The package is also on npm as `dainami-kie-mcp`, so terminal users can skip the folder entirely: `claude mcp add --scope user kie --env KIE_API_KEY=YOUR_KEY -- npx -y dainami-kie-mcp` (same shape for `codex mcp add`).
+
+To point any other MCP client at the folder, the config shape is always:
 
 ```json
 {
@@ -223,11 +173,7 @@ Point Claude at your local copy:
 }
 ```
 
-For dev with auto-reload:
-
-```bash
-KIE_API_KEY=kie-... npm run dev
-```
+Note: ChatGPT chat conversations can't use this connector — they only accept servers hosted at a URL, and this one runs locally. The Codex side of the ChatGPT app works fine.
 
 ---
 
@@ -239,9 +185,9 @@ Most MCP wrappers around AI APIs hard-code one tool per model: `generate_seedanc
 - The wrapper's mental model of each model's JSON shape drifts from reality
 - The wrapper becomes the bottleneck
 
-This package goes the opposite direction: **three generic tools** that work for everything KIE has, with KIE's docs as the source of truth for shapes. Claude is smart enough to read docs and construct payloads. The MCP just makes the HTTP call.
+This package goes the opposite direction: **five generic tools** that work for everything KIE has, with KIE's docs as the source of truth for shapes. The agent is smart enough to read docs and construct payloads. The MCP just makes the HTTP call.
 
-When KIE ships a new model tomorrow, no PR here. Just point your agent's knowledge files at the new docs URL.
+When KIE ships a new model tomorrow, no PR here. Just point your agent at the new docs.
 
 ---
 
