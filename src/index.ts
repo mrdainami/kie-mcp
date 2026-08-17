@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * @dainami/kie-mcp v0.3.0
+ * dainami-kie-mcp v0.4.0
  *
  * KIE.ai connector for MCP. Discovers models from the live KIE docs site
  * rather than maintaining hand-written per-model markdown — so the catalogue
@@ -549,7 +549,7 @@ If kie_post returns a 4xx with a parameter-error message (e.g. "missing required
 `.trim();
 
 const server = new Server(
-  { name: "dainami-kie-mcp", version: "0.3.0" },
+  { name: "dainami-kie-mcp", version: "0.4.0" },
   {
     capabilities: { tools: {}, resources: {} },
     instructions: SERVER_INSTRUCTIONS,
@@ -716,5 +716,5 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 const transport = new StdioServerTransport();
 await server.connect(transport);
 console.error(
-  `[dainami-kie-mcp] running on stdio (v0.3.0 — live-docs discovery via kie_fetch_model_docs)`,
+  `[dainami-kie-mcp] running on stdio (v0.4.0 — live-docs discovery via kie_fetch_model_docs)`,
 );
