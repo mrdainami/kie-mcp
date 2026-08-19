@@ -78,6 +78,19 @@ type HttpResponse = {
 };
 
 // ---------------------------------------------------------------------------
+// Header hygiene — credentials must not survive a cross-origin redirect.
+// ---------------------------------------------------------------------------
+const SENSITIVE_HEADERS = new Set(["authorization", "cookie", "proxy-authorization"]);
+
+function stripSensitiveHeaders(headers: HttpHeaders): HttpHeaders {
+  const out: HttpHeaders = {};
+  for (const [k, v] of Object.entries(headers)) {
+    if (!SENSITIVE_HEADERS.has(k.toLowerCase())) out[k] = v;
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // HTTP — minimal fetch-like wrapper with redirect handling.
 // Returns body as string by default, or Buffer when asBuffer=true (for
 // binary downloads).
@@ -128,9 +141,15 @@ function httpRequest(
           const newMethod =
             status === 307 || status === 308 ? method : "GET";
           const newBody = newMethod === method ? body : undefined;
-          const nextUrl = new URL(location, urlStr).toString();
+          const nextUrlObj = new URL(location, urlStr);
+          const nextUrl = nextUrlObj.toString();
+          // Never carry credentials across an origin change. A redirect from an
+          // allowed KIE host to an attacker-controlled host would otherwise leak
+          // the bearer token in the follow-up request.
+          const nextHeaders =
+            nextUrlObj.origin === u.origin ? headers : stripSensitiveHeaders(headers);
           resolve(
-            httpRequest(newMethod, nextUrl, headers, newBody, redirectCount + 1, asBuffer),
+            httpRequest(newMethod, nextUrl, nextHeaders, newBody, redirectCount + 1, asBuffer),
           );
           return;
         }
