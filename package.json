@@ -1,7 +1,7 @@
 {
   "name": "dainami-kie-mcp",
   "version": "0.5.1",
-  "description": "KIE.ai connector for MCP. Five generic tools — kie_post, kie_get, kie_upload_file, kie_download, kie_fetch_model_docs — give an agent every current and future KIE model. Model specs are pulled live from docs.kie.ai with a 3-day cache; the MCP never bundles per-model docs that go stale.",
+  "description": "KIE.ai connector for MCP. Five generic tools \u2014 kie_post, kie_get, kie_upload_file, kie_download, kie_fetch_model_docs \u2014 give an agent every current and future KIE model. Model specs are pulled live from docs.kie.ai with a 3-day cache; the MCP never bundles per-model docs that go stale.",
   "type": "module",
   "bin": {
     "dainami-kie-mcp": "dist/index.js"
@@ -52,5 +52,8 @@
     "ai",
     "image-generation",
     "video-generation"
-  ]
+  ],
+  "overrides": {
+    "fast-uri": "4.1.2"
+  }
 }
