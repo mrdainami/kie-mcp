@@ -443,6 +443,29 @@ type DownloadArgs = {
   destPath: string;
 };
 
+// Writing one of these lands code in a place something else will run: shell
+// profiles, editor tasks, npm lifecycle hooks, Windows autoruns.
+const DENIED_DOWNLOAD_EXTS = new Set([
+  ".sh", ".bash", ".zsh", ".fish", ".ps1", ".psm1", ".bat", ".cmd", ".com",
+  ".exe", ".dll", ".so", ".dylib", ".scr", ".msi", ".app", ".vbs", ".wsf",
+  ".js", ".mjs", ".cjs", ".ts", ".py", ".rb", ".pl", ".php", ".jar", ".lnk",
+  ".desktop", ".service", ".plist", ".reg",
+]);
+
+function assertDownloadableDest(absPath: string): void {
+  const base = path.basename(absPath);
+  if (base.startsWith(".")) {
+    throw new Error(`Blocked: refusing to write dotfile ${base}.`);
+  }
+  const ext = path.extname(absPath).toLowerCase();
+  if (DENIED_DOWNLOAD_EXTS.has(ext)) {
+    throw new Error(
+      `Blocked: refusing to write an executable or script destination (${ext}). ` +
+        `kie_download is for generated media.`,
+    );
+  }
+}
+
 async function kieDownload(args: DownloadArgs) {
   const { url, destPath } = args;
   if (!url || typeof url !== "string") {
@@ -451,9 +474,18 @@ async function kieDownload(args: DownloadArgs) {
   if (!destPath || typeof destPath !== "string") {
     throw new Error("destPath is required (string)");
   }
-  const absDest = path.isAbsolute(destPath)
-    ? destPath
-    : path.resolve(process.cwd(), destPath);
+  let scheme: string;
+  try {
+    scheme = new URL(url).protocol;
+  } catch {
+    throw new Error(`Invalid URL: ${url}`);
+  }
+  if (scheme !== "https:" && scheme !== "http:") {
+    throw new Error(`Blocked: kie_download only supports http(s) URLs — got ${scheme}`);
+  }
+
+  const absDest = await resolveInsideWorkspace(destPath, "kie_download");
+  assertDownloadableDest(absDest);
   await fsp.mkdir(path.dirname(absDest), { recursive: true });
 
   const res = await httpRequest(
