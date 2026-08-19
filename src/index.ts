@@ -63,6 +63,42 @@ if (!KIE_API_KEY) {
   process.exit(1);
 }
 
+// ---------------------------------------------------------------------------
+// Origin allowlist — the API key is only ever sent to hosts we configured.
+// ---------------------------------------------------------------------------
+function originOf(urlStr: string): string {
+  return new URL(urlStr).origin;
+}
+
+// Endpoints that receive `Authorization: Bearer $KIE_API_KEY`.
+const ALLOWED_API_ORIGINS = new Set<string>([
+  originOf(KIE_BASE_URL),
+  originOf(KIE_UPLOAD_URL),
+]);
+
+// Endpoints we fetch documentation from. No credentials are sent here, but the
+// response is fed back into the agent's context, so the source must be pinned.
+const ALLOWED_DOCS_ORIGINS = new Set<string>([originOf(KIE_DOCS_BASE)]);
+
+function assertAllowedOrigin(
+  urlStr: string,
+  allowed: Set<string>,
+  what: string,
+): void {
+  let origin: string;
+  try {
+    origin = originOf(urlStr);
+  } catch {
+    throw new Error(`Invalid URL: ${urlStr}`);
+  }
+  if (!allowed.has(origin)) {
+    throw new Error(
+      `Blocked: ${what} may only target ${[...allowed].join(", ")} — got ${origin}. ` +
+        `If this is a legitimate KIE host, set KIE_BASE_URL / KIE_UPLOAD_URL / KIE_DOCS_BASE accordingly.`,
+    );
+  }
+}
+
 type FetchResult = {
   status: number;
   ok: boolean;
@@ -182,6 +218,9 @@ async function kieFetch(
   const url = endpoint.startsWith("http")
     ? endpoint
     : `${KIE_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+  // A caller-supplied absolute URL must not be able to redirect the bearer
+  // token to an arbitrary host.
+  assertAllowedOrigin(url, ALLOWED_API_ORIGINS, "kie_post / kie_get");
   const res = await httpRequest(
     method,
     url,
