@@ -15579,7 +15579,8 @@ async function kieFetch(method, endpoint, body) {
   }
   return { status: res.status, ok: res.status >= 200 && res.status < 300, body: parsed };
 }
-var WORKSPACE_ROOT = path.resolve(process.env.KIE_WORKSPACE_DIR ?? process.cwd());
+var WORKSPACE_SETTING = (process.env.KIE_WORKSPACE_DIR ?? "").trim();
+var WORKSPACE_ROOT = path.resolve(WORKSPACE_SETTING.length > 0 ? WORKSPACE_SETTING : process.cwd());
 function assertWorkspaceUsable() {
   const parsed = path.parse(WORKSPACE_ROOT);
   if (WORKSPACE_ROOT === parsed.root || WORKSPACE_ROOT === path.resolve(os.homedir())) {
