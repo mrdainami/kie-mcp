@@ -483,16 +483,23 @@ const DENIED_DOWNLOAD_BASENAMES = new Set([
 ]);
 
 function assertDownloadableDest(absPath: string): void {
-  const base = path.basename(absPath);
-  if (base.startsWith(".")) {
-    throw new Error(`Blocked: refusing to write dotfile ${base}.`);
+  // Windows strips trailing dots/spaces at write time, so "evil.js." lands on
+  // disk as "evil.js" — check the name the filesystem will actually create.
+  const base = path.basename(absPath).replace(/[. ]+$/, "");
+  if (base !== path.basename(absPath)) {
+    throw new Error(
+      `Blocked: refusing a destination with trailing dots/spaces (${path.basename(absPath)}).`,
+    );
+  }
+  if (base === "" || base.startsWith(".")) {
+    throw new Error(`Blocked: refusing to write dotfile ${path.basename(absPath)}.`);
   }
   if (DENIED_DOWNLOAD_BASENAMES.has(base.toLowerCase())) {
     throw new Error(
       `Blocked: refusing to overwrite a build/config file (${base}). kie_download is for generated media.`,
     );
   }
-  const ext = path.extname(absPath).toLowerCase();
+  const ext = path.extname(base).toLowerCase();
   if (DENIED_DOWNLOAD_EXTS.has(ext)) {
     throw new Error(
       `Blocked: refusing to write an executable or script destination (${ext}). ` +
