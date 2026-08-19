@@ -3639,21 +3639,21 @@ var require_fast_uri = __commonJS({
         normalizeString(uri, options);
       } else if (typeof uri === "object") {
         uri = /** @type {T} */
-        parse3(serialize(uri, options), options);
+        parse4(serialize(uri, options), options);
       }
       return uri;
     }
     function resolve2(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
-      const resolved = resolveComponent(parse3(baseURI, schemelessOptions), parse3(relativeURI, schemelessOptions), schemelessOptions, true);
+      const resolved = resolveComponent(parse4(baseURI, schemelessOptions), parse4(relativeURI, schemelessOptions), schemelessOptions, true);
       schemelessOptions.skipEscape = true;
       return serialize(resolved, schemelessOptions);
     }
     function resolveComponent(base, relative2, options, skipNormalization) {
       const target = {};
       if (!skipNormalization) {
-        base = parse3(serialize(base, options), options);
-        relative2 = parse3(serialize(relative2, options), options);
+        base = parse4(serialize(base, options), options);
+        relative2 = parse4(serialize(relative2, options), options);
       }
       options = options || {};
       if (!options.tolerant && relative2.scheme) {
@@ -3876,7 +3876,7 @@ var require_fast_uri = __commonJS({
       }
       return { parsed, malformedAuthorityOrPort };
     }
-    function parse3(uri, opts) {
+    function parse4(uri, opts) {
       return parseWithStatus(uri, opts).parsed;
     }
     function normalizeString(uri, opts) {
@@ -3905,7 +3905,7 @@ var require_fast_uri = __commonJS({
       resolveComponent,
       equal,
       serialize,
-      parse: parse3
+      parse: parse4
     };
     module.exports = fastUri;
     module.exports.default = fastUri;
@@ -15470,6 +15470,35 @@ if (!KIE_API_KEY) {
   console.error("[dainami-kie-mcp] KIE_API_KEY environment variable is required");
   process.exit(1);
 }
+function originOf(urlStr) {
+  return new URL(urlStr).origin;
+}
+var ALLOWED_API_ORIGINS = /* @__PURE__ */ new Set([
+  originOf(KIE_BASE_URL),
+  originOf(KIE_UPLOAD_URL)
+]);
+var ALLOWED_DOCS_ORIGINS = /* @__PURE__ */ new Set([originOf(KIE_DOCS_BASE)]);
+function assertAllowedOrigin(urlStr, allowed, what) {
+  let origin;
+  try {
+    origin = originOf(urlStr);
+  } catch {
+    throw new Error(`Invalid URL: ${urlStr}`);
+  }
+  if (!allowed.has(origin)) {
+    throw new Error(
+      `Blocked: ${what} may only target ${[...allowed].join(", ")} \u2014 got ${origin}. If this is a legitimate KIE host, set KIE_BASE_URL / KIE_UPLOAD_URL / KIE_DOCS_BASE accordingly.`
+    );
+  }
+}
+var SENSITIVE_HEADERS = /* @__PURE__ */ new Set(["authorization", "cookie", "proxy-authorization"]);
+function stripSensitiveHeaders(headers) {
+  const out = {};
+  for (const [k, v] of Object.entries(headers)) {
+    if (!SENSITIVE_HEADERS.has(k.toLowerCase())) out[k] = v;
+  }
+  return out;
+}
 function httpRequest(method, urlStr, headers, body, redirectCount = 0, asBuffer = false) {
   return new Promise((resolve2, reject) => {
     let u;
@@ -15502,9 +15531,11 @@ function httpRequest(method, urlStr, headers, body, redirectCount = 0, asBuffer 
           res.resume();
           const newMethod = status === 307 || status === 308 ? method : "GET";
           const newBody = newMethod === method ? body : void 0;
-          const nextUrl = new URL(location, urlStr).toString();
+          const nextUrlObj = new URL(location, urlStr);
+          const nextUrl = nextUrlObj.toString();
+          const nextHeaders = nextUrlObj.origin === u.origin ? headers : stripSensitiveHeaders(headers);
           resolve2(
-            httpRequest(newMethod, nextUrl, headers, newBody, redirectCount + 1, asBuffer)
+            httpRequest(newMethod, nextUrl, nextHeaders, newBody, redirectCount + 1, asBuffer)
           );
           return;
         }
@@ -15528,6 +15559,7 @@ function httpRequest(method, urlStr, headers, body, redirectCount = 0, asBuffer 
 }
 async function kieFetch(method, endpoint, body) {
   const url = endpoint.startsWith("http") ? endpoint : `${KIE_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+  assertAllowedOrigin(url, ALLOWED_API_ORIGINS, "kie_post / kie_get");
   const res = await httpRequest(
     method,
     url,
@@ -15547,24 +15579,76 @@ async function kieFetch(method, endpoint, body) {
   }
   return { status: res.status, ok: res.status >= 200 && res.status < 300, body: parsed };
 }
+var WORKSPACE_ROOT = path.resolve(process.env.KIE_WORKSPACE_DIR ?? process.cwd());
+function assertWorkspaceUsable() {
+  const parsed = path.parse(WORKSPACE_ROOT);
+  if (WORKSPACE_ROOT === parsed.root || WORKSPACE_ROOT === path.resolve(os.homedir())) {
+    throw new Error(
+      `Refusing to use ${WORKSPACE_ROOT} as the file workspace \u2014 it is too broad. Set KIE_WORKSPACE_DIR to the project directory that may be read from and written to.`
+    );
+  }
+}
+async function realpathNearest(target) {
+  let current = target;
+  const trailing = [];
+  for (; ; ) {
+    try {
+      const real = await fsp.realpath(current);
+      return path.resolve(real, ...trailing.reverse());
+    } catch {
+      const parent = path.dirname(current);
+      if (parent === current) return path.resolve(target);
+      trailing.push(path.basename(current));
+      current = parent;
+    }
+  }
+}
+function isInside(root, candidate) {
+  const rel = path.relative(root, candidate);
+  return rel === "" || !rel.startsWith("..") && !path.isAbsolute(rel);
+}
+async function resolveInsideWorkspace(inputPath, what) {
+  assertWorkspaceUsable();
+  const abs = path.isAbsolute(inputPath) ? path.resolve(inputPath) : path.resolve(WORKSPACE_ROOT, inputPath);
+  const real = await realpathNearest(abs);
+  const realRoot = await realpathNearest(WORKSPACE_ROOT);
+  if (!isInside(realRoot, real)) {
+    throw new Error(
+      `Blocked: ${what} is restricted to ${realRoot} \u2014 refused ${abs}. Set KIE_WORKSPACE_DIR if the file lives elsewhere.`
+    );
+  }
+  return real;
+}
+var UPLOADABLE_CONTENT_TYPES = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".mp4": "video/mp4",
+  ".mov": "video/quicktime",
+  ".webm": "video/webm",
+  ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
+  ".m4a": "audio/mp4",
+  ".pdf": "application/pdf",
+  ".txt": "text/plain"
+};
 function guessContentType(filePath) {
   const ext = path.extname(filePath).toLowerCase();
-  const map = {
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".webp": "image/webp",
-    ".gif": "image/gif",
-    ".mp4": "video/mp4",
-    ".mov": "video/quicktime",
-    ".webm": "video/webm",
-    ".mp3": "audio/mpeg",
-    ".wav": "audio/wav",
-    ".m4a": "audio/mp4",
-    ".pdf": "application/pdf",
-    ".txt": "text/plain"
-  };
-  return map[ext] ?? "application/octet-stream";
+  return UPLOADABLE_CONTENT_TYPES[ext] ?? "application/octet-stream";
+}
+function assertUploadableFile(absPath) {
+  const base = path.basename(absPath);
+  if (base.startsWith(".")) {
+    throw new Error(`Blocked: refusing to upload dotfile ${base}.`);
+  }
+  const ext = path.extname(absPath).toLowerCase();
+  if (!(ext in UPLOADABLE_CONTENT_TYPES)) {
+    throw new Error(
+      `Blocked: ${ext || "extension-less"} files are not uploadable. KIE references accept ${Object.keys(UPLOADABLE_CONTENT_TYPES).join(", ")}.`
+    );
+  }
 }
 function buildMultipartBody(fields, fileField, fileName, fileBuffer, contentType, boundary) {
   const parts = [];
@@ -15601,7 +15685,8 @@ async function kieUploadFile(args) {
   if (!localPath || typeof localPath !== "string") {
     throw new Error("localPath is required (string)");
   }
-  const absPath = path.isAbsolute(localPath) ? localPath : path.resolve(process.cwd(), localPath);
+  const absPath = await resolveInsideWorkspace(localPath, "kie_upload_file");
+  assertUploadableFile(absPath);
   let fileBuffer;
   try {
     fileBuffer = await fsp.readFile(absPath);
@@ -15649,6 +15734,52 @@ async function kieUploadFile(args) {
     response: parsed
   };
 }
+var DENIED_DOWNLOAD_EXTS = /* @__PURE__ */ new Set([
+  ".sh",
+  ".bash",
+  ".zsh",
+  ".fish",
+  ".ps1",
+  ".psm1",
+  ".bat",
+  ".cmd",
+  ".com",
+  ".exe",
+  ".dll",
+  ".so",
+  ".dylib",
+  ".scr",
+  ".msi",
+  ".app",
+  ".vbs",
+  ".wsf",
+  ".js",
+  ".mjs",
+  ".cjs",
+  ".ts",
+  ".py",
+  ".rb",
+  ".pl",
+  ".php",
+  ".jar",
+  ".lnk",
+  ".desktop",
+  ".service",
+  ".plist",
+  ".reg"
+]);
+function assertDownloadableDest(absPath) {
+  const base = path.basename(absPath);
+  if (base.startsWith(".")) {
+    throw new Error(`Blocked: refusing to write dotfile ${base}.`);
+  }
+  const ext = path.extname(absPath).toLowerCase();
+  if (DENIED_DOWNLOAD_EXTS.has(ext)) {
+    throw new Error(
+      `Blocked: refusing to write an executable or script destination (${ext}). kie_download is for generated media.`
+    );
+  }
+}
 async function kieDownload(args) {
   const { url, destPath } = args;
   if (!url || typeof url !== "string") {
@@ -15657,7 +15788,17 @@ async function kieDownload(args) {
   if (!destPath || typeof destPath !== "string") {
     throw new Error("destPath is required (string)");
   }
-  const absDest = path.isAbsolute(destPath) ? destPath : path.resolve(process.cwd(), destPath);
+  let scheme;
+  try {
+    scheme = new URL(url).protocol;
+  } catch {
+    throw new Error(`Invalid URL: ${url}`);
+  }
+  if (scheme !== "https:" && scheme !== "http:") {
+    throw new Error(`Blocked: kie_download only supports http(s) URLs \u2014 got ${scheme}`);
+  }
+  const absDest = await resolveInsideWorkspace(destPath, "kie_download");
+  assertDownloadableDest(absDest);
   await fsp.mkdir(path.dirname(absDest), { recursive: true });
   const res = await httpRequest(
     "GET",
@@ -15711,9 +15852,10 @@ function resolveDocsUrl(args) {
   } else {
     throw new Error("kie_fetch_model_docs requires either { path } (e.g. 'google/nanobanana2') or { url }");
   }
+  assertAllowedOrigin(raw, ALLOWED_DOCS_ORIGINS, "kie_fetch_model_docs");
   try {
     const u = new URL(raw);
-    if (u.hostname === "docs.kie.ai" && !u.pathname.endsWith(".md") && !u.search) {
+    if (u.hostname === new URL(KIE_DOCS_BASE).hostname && !u.pathname.endsWith(".md") && !u.search) {
       u.pathname = u.pathname + ".md";
       return u.toString();
     }
