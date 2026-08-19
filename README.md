@@ -137,6 +137,37 @@ Different model families use slightly different envelopes (Veo, Suno, Flux-Konte
 |---|---|---|
 | `KIE_API_KEY` | — | **Yes** |
 | `KIE_BASE_URL` | `https://api.kie.ai` | No (override for testing / proxy) |
+| `KIE_UPLOAD_URL` | `https://kieai.redpandaai.co/api/file-stream-upload` | No |
+| `KIE_DOCS_BASE` | `https://docs.kie.ai` | No |
+| `KIE_WORKSPACE_DIR` | the server's working directory | Recommended (see Security) |
+
+---
+
+## Security model
+
+The agent driving these tools reads untrusted content — model docs, generation
+results, filenames. Anything it reads can try to instruct it, so the server does
+not trust the arguments it receives. Four limits are enforced:
+
+- **The API key only reaches configured hosts.** `kie_post` / `kie_get` accept an
+  absolute URL, but its origin must match `KIE_BASE_URL` or `KIE_UPLOAD_URL`, and
+  credentials are dropped whenever a redirect crosses origins.
+- **Docs come from one place.** `kie_fetch_model_docs` only fetches from
+  `KIE_DOCS_BASE`, on every redirect hop — fetched pages enter the agent's
+  context and are cached ~3 days, so an arbitrary source would be a persistent
+  injection channel.
+- **File access is confined to a workspace.** `kie_upload_file` and `kie_download`
+  resolve every path (symlinks included) and refuse anything outside
+  `KIE_WORKSPACE_DIR`. It defaults to the working directory, which for a
+  host-launched server is arbitrary — **set it to your project folder.** A
+  workspace of `/` or your bare home directory is refused.
+- **Only media crosses the boundary.** Uploads are limited to known media types;
+  downloads refuse dotfiles, dot-directories, build/config files, and
+  executable or script destinations.
+
+Found a problem? Please report it privately through
+[GitHub Security Advisories](https://github.com/mrdainami/kie-mcp/security/advisories/new)
+rather than a public issue.
 
 ---
 
