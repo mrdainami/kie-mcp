@@ -244,26 +244,101 @@ async function kieFetch(
 }
 
 // ---------------------------------------------------------------------------
+// Filesystem sandbox — kie_upload_file reads local files and kie_download
+// writes them. Both take a caller-supplied path, and the caller is an LLM that
+// can be steered by untrusted content, so every path is resolved and confined
+// to a single workspace root.
+// ---------------------------------------------------------------------------
+const WORKSPACE_ROOT = path.resolve(process.env.KIE_WORKSPACE_DIR ?? process.cwd());
+
+function assertWorkspaceUsable(): void {
+  // A root of "/" or the bare home directory confines nothing. Fail closed and
+  // make the operator name a real directory instead.
+  const parsed = path.parse(WORKSPACE_ROOT);
+  if (WORKSPACE_ROOT === parsed.root || WORKSPACE_ROOT === path.resolve(os.homedir())) {
+    throw new Error(
+      `Refusing to use ${WORKSPACE_ROOT} as the file workspace — it is too broad. ` +
+        `Set KIE_WORKSPACE_DIR to the project directory that may be read from and written to.`,
+    );
+  }
+}
+
+/** Realpath of the deepest existing ancestor, so symlinks cannot escape the root. */
+async function realpathNearest(target: string): Promise<string> {
+  let current = target;
+  const trailing: string[] = [];
+  for (;;) {
+    try {
+      const real = await fsp.realpath(current);
+      return path.resolve(real, ...trailing.reverse());
+    } catch {
+      const parent = path.dirname(current);
+      if (parent === current) return path.resolve(target);
+      trailing.push(path.basename(current));
+      current = parent;
+    }
+  }
+}
+
+function isInside(root: string, candidate: string): boolean {
+  const rel = path.relative(root, candidate);
+  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+}
+
+async function resolveInsideWorkspace(inputPath: string, what: string): Promise<string> {
+  assertWorkspaceUsable();
+  // Relative paths resolve against the workspace, not the process cwd, which
+  // for a host-launched MCP server is arbitrary.
+  const abs = path.isAbsolute(inputPath)
+    ? path.resolve(inputPath)
+    : path.resolve(WORKSPACE_ROOT, inputPath);
+  const real = await realpathNearest(abs);
+  const realRoot = await realpathNearest(WORKSPACE_ROOT);
+  if (!isInside(realRoot, real)) {
+    throw new Error(
+      `Blocked: ${what} is restricted to ${realRoot} — refused ${abs}. ` +
+        `Set KIE_WORKSPACE_DIR if the file lives elsewhere.`,
+    );
+  }
+  return real;
+}
+
+// ---------------------------------------------------------------------------
 // Multipart upload — assembled by hand so we don't pull in a form-data dep.
 // ---------------------------------------------------------------------------
+const UPLOADABLE_CONTENT_TYPES: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".mp4": "video/mp4",
+  ".mov": "video/quicktime",
+  ".webm": "video/webm",
+  ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
+  ".m4a": "audio/mp4",
+  ".pdf": "application/pdf",
+  ".txt": "text/plain",
+};
+
 function guessContentType(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();
-  const map: Record<string, string> = {
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".webp": "image/webp",
-    ".gif": "image/gif",
-    ".mp4": "video/mp4",
-    ".mov": "video/quicktime",
-    ".webm": "video/webm",
-    ".mp3": "audio/mpeg",
-    ".wav": "audio/wav",
-    ".m4a": "audio/mp4",
-    ".pdf": "application/pdf",
-    ".txt": "text/plain",
-  };
-  return map[ext] ?? "application/octet-stream";
+  return UPLOADABLE_CONTENT_TYPES[ext] ?? "application/octet-stream";
+}
+
+function assertUploadableFile(absPath: string): void {
+  const base = path.basename(absPath);
+  if (base.startsWith(".")) {
+    throw new Error(`Blocked: refusing to upload dotfile ${base}.`);
+  }
+  const ext = path.extname(absPath).toLowerCase();
+  if (!(ext in UPLOADABLE_CONTENT_TYPES)) {
+    throw new Error(
+      `Blocked: ${ext || "extension-less"} files are not uploadable. ` +
+        `KIE references accept ${Object.keys(UPLOADABLE_CONTENT_TYPES).join(", ")}.`,
+    );
+  }
 }
 
 function buildMultipartBody(
@@ -304,9 +379,8 @@ async function kieUploadFile(args: UploadFileArgs) {
   if (!localPath || typeof localPath !== "string") {
     throw new Error("localPath is required (string)");
   }
-  const absPath = path.isAbsolute(localPath)
-    ? localPath
-    : path.resolve(process.cwd(), localPath);
+  const absPath = await resolveInsideWorkspace(localPath, "kie_upload_file");
+  assertUploadableFile(absPath);
 
   let fileBuffer: Buffer;
   try {
