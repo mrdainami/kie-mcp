@@ -139,7 +139,7 @@ Different model families use slightly different envelopes (Veo, Suno, Flux-Konte
 | `KIE_BASE_URL` | `https://api.kie.ai` | No (override for testing / proxy) |
 | `KIE_UPLOAD_URL` | `https://kieai.redpandaai.co/api/file-stream-upload` | No |
 | `KIE_DOCS_BASE` | `https://docs.kie.ai` | No |
-| `KIE_WORKSPACE_DIR` | process working directory | Recommended (see below) |
+| `KIE_WORKSPACE_DIR` | process working directory | Required in the `.mcpb`; recommended everywhere else (see below) |
 
 ---
 
@@ -161,9 +161,10 @@ channel.
 
 **File access is confined to a workspace.** `kie_upload_file` and
 `kie_download` resolve every path — symlinks included — and refuse anything
-outside `KIE_WORKSPACE_DIR`. It defaults to the process working directory,
-which for a host-launched server is arbitrary; **set it explicitly to your
-project folder**. A workspace of `/` or your bare home directory is rejected.
+outside `KIE_WORKSPACE_DIR`. The `.mcpb` asks for it as a required folder at
+install time; terminal installs should pass it explicitly, since the fallback
+(the process working directory) is arbitrary for a host-launched server. A
+workspace of `/` or your bare home directory is rejected.
 
 **Only media crosses the boundary.** Uploads are limited to the extensions the
 server knows how to label; downloads refuse dotfiles and executable or script
