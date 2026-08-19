@@ -16036,7 +16036,7 @@ If kie_post returns a 4xx with a parameter-error message (e.g. "missing required
 - Don't print the API key.
 `.trim();
 var server = new Server(
-  { name: "dainami-kie-mcp", version: "0.5.1" },
+  { name: "dainami-kie-mcp", version: "0.5.2" },
   {
     capabilities: { tools: {}, resources: {} },
     instructions: SERVER_INSTRUCTIONS
@@ -16182,5 +16182,5 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 var transport = new StdioServerTransport();
 await server.connect(transport);
 console.error(
-  `[dainami-kie-mcp] running on stdio (v0.5.1 \u2014 live-docs discovery via kie_fetch_model_docs)`
+  `[dainami-kie-mcp] running on stdio (v0.5.2 \u2014 live-docs discovery via kie_fetch_model_docs)`
 );
