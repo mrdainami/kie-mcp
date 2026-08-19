@@ -13,15 +13,25 @@
   "documentation": "https://github.com/mrdainami/kie-mcp#readme",
   "support": "https://github.com/mrdainami/kie-mcp/issues",
   "license": "MIT",
-  "keywords": ["kie", "kie.ai", "image-generation", "video-generation", "music-generation", "ai"],
+  "keywords": [
+    "kie",
+    "kie.ai",
+    "image-generation",
+    "video-generation",
+    "music-generation",
+    "ai"
+  ],
   "server": {
     "type": "node",
     "entry_point": "dist/index.js",
     "mcp_config": {
       "command": "node",
-      "args": ["${__dirname}/dist/index.js"],
+      "args": [
+        "${__dirname}/dist/index.js"
+      ],
       "env": {
-        "KIE_API_KEY": "${user_config.kie_api_key}"
+        "KIE_API_KEY": "${user_config.kie_api_key}",
+        "KIE_WORKSPACE_DIR": "${user_config.kie_workspace_dir}"
       }
     }
   },
@@ -32,18 +42,43 @@
       "description": "Your KIE.ai API key. Get one at https://kie.ai",
       "sensitive": true,
       "required": true
+    },
+    "kie_workspace_dir": {
+      "type": "directory",
+      "title": "Media workspace",
+      "description": "Folder this connector may read reference files from and write results into. Uploads and downloads are confined to it — nothing outside is reachable. Pick a dedicated media folder, not your home directory or a code project.",
+      "required": true
     }
   },
   "tools": [
-    { "name": "kie_post", "description": "POST to any KIE endpoint (usually createTask)." },
-    { "name": "kie_get", "description": "GET from any KIE endpoint (usually recordInfo for polling)." },
-    { "name": "kie_upload_file", "description": "Upload a local file to KIE storage; returns a hosted URL (~3d TTL)." },
-    { "name": "kie_download", "description": "Download a URL (e.g. a KIE result) to a local file." },
-    { "name": "kie_fetch_model_docs", "description": "Fetch a model's live docs page from docs.kie.ai (cached ~3 days)." }
+    {
+      "name": "kie_post",
+      "description": "POST to any KIE endpoint (usually createTask)."
+    },
+    {
+      "name": "kie_get",
+      "description": "GET from any KIE endpoint (usually recordInfo for polling)."
+    },
+    {
+      "name": "kie_upload_file",
+      "description": "Upload a local file to KIE storage; returns a hosted URL (~3d TTL)."
+    },
+    {
+      "name": "kie_download",
+      "description": "Download a URL (e.g. a KIE result) to a local file."
+    },
+    {
+      "name": "kie_fetch_model_docs",
+      "description": "Fetch a model's live docs page from docs.kie.ai (cached ~3 days)."
+    }
   ],
   "compatibility": {
     "claude_desktop": ">=0.10.0",
-    "platforms": ["darwin", "win32", "linux"],
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
     "runtimes": {
       "node": ">=18.0.0"
     }

@@ -261,7 +261,10 @@ async function kieFetch(
 // can be steered by untrusted content, so every path is resolved (symlinks
 // included) and confined to a single workspace root.
 // ---------------------------------------------------------------------------
-const WORKSPACE_ROOT = path.resolve(process.env.KIE_WORKSPACE_DIR ?? process.cwd());
+// An unset directory field in a host UI arrives as an empty string, not as an
+// absent variable — treat blank as unset rather than silently resolving to cwd.
+const WORKSPACE_SETTING = (process.env.KIE_WORKSPACE_DIR ?? "").trim();
+const WORKSPACE_ROOT = path.resolve(WORKSPACE_SETTING.length > 0 ? WORKSPACE_SETTING : process.cwd());
 
 function assertWorkspaceUsable(): void {
   // A root of "/" or the bare home directory confines nothing. Fail closed and
