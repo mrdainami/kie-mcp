@@ -459,9 +459,14 @@ function resolveDocsUrl(args: FetchDocsArgs): string {
   // docs.kie.ai serves a compact markdown source when the URL ends in `.md`.
   // Rendered HTML is ~400KB; markdown is ~20KB. Always prefer the .md form
   // when the host is docs.kie.ai and the URL doesn't already specify a format.
+  // Pin the source: the fetched page is injected straight into the agent's
+  // context, so an arbitrary host here is an instruction-injection channel
+  // (and the result is cached on disk for ~3 days, making it persistent).
+  assertAllowedOrigin(raw, ALLOWED_DOCS_ORIGINS, "kie_fetch_model_docs");
+
   try {
     const u = new URL(raw);
-    if (u.hostname === "docs.kie.ai" && !u.pathname.endsWith(".md") && !u.search) {
+    if (u.hostname === new URL(KIE_DOCS_BASE).hostname && !u.pathname.endsWith(".md") && !u.search) {
       u.pathname = u.pathname + ".md";
       return u.toString();
     }
